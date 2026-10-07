@@ -39,6 +39,7 @@ function safeProvider(provider) {
   return [
     "M-Pesa",
     "Airtel Money",
+    "Tigo Pesa",
     "Mixx by Yas",
     "T-Pesa",
     "HaloPesa",
@@ -72,14 +73,12 @@ app.get("/api/health", async (_req, res) => {
       database: "connected",
     });
   } catch (error) {
-    res
-      .status(503)
-      .json({
-        ok: false,
-        service: "Imaz Homes booking API",
-        database: "disconnected",
-        message: error.message,
-      });
+    res.status(503).json({
+      ok: false,
+      service: "Imaz Homes booking API",
+      database: "disconnected",
+      message: error.message,
+    });
   }
 });
 
@@ -118,6 +117,27 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(400).json({ message: "Invalid booking total." });
     }
 
+    // CHECK IF THE DATES ARE ALREADY BOOKED
+    const [existingBookings] = await db.execute(
+      `SELECT id, check_in, check_out, status
+   FROM bookings
+   WHERE check_in < ?
+   AND check_out > ?
+   AND status NOT IN ('cancelled', 'payment-failed')
+   LIMIT 1`,
+      [checkOut, checkIn],
+    );
+
+    console.log("Checking dates:", checkIn, checkOut);
+    console.log("Existing overlapping booking:", existingBookings);
+
+    if (existingBookings.length > 0) {
+      return res.status(409).json({
+        message:
+          "These dates are already booked. Please choose different dates.",
+      });
+    }
+
     const id = makeId("IMAZ");
     await db.execute(
       `INSERT INTO bookings
@@ -145,11 +165,9 @@ app.post("/api/bookings", async (req, res) => {
     res.status(201).json({ booking });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({
-        message: "Could not save booking. Check your MySQL connection.",
-      });
+    res.status(500).json({
+      message: "Could not save booking. Check your MySQL connection.",
+    });
   }
 });
 
@@ -187,11 +205,9 @@ app.post("/api/payments/initiate", async (req, res) => {
     const normalizedPhone =
       method === "mobile-money" ? normalizePhone(phone) : null;
     if (method === "mobile-money" && !normalizedPhone) {
-      return res
-        .status(400)
-        .json({
-          message: "Enter a valid Tanzanian mobile number, e.g. 0712345678.",
-        });
+      return res.status(400).json({
+        message: "Enter a valid Tanzanian mobile number, e.g. 0712345678.",
+      });
     }
 
     const transactionId = makeId("PAY");
@@ -269,12 +285,10 @@ app.post("/api/payments/initiate", async (req, res) => {
     );
 
     if (!gatewayResponse.ok) {
-      return res
-        .status(502)
-        .json({
-          message: "Payment gateway rejected the request.",
-          transactionId,
-        });
+      return res.status(502).json({
+        message: "Payment gateway rejected the request.",
+        transactionId,
+      });
     }
 
     res.json({ transactionId, status: "pending", live: true, gateway: data });
