@@ -39,6 +39,7 @@ const photos = [
 
 const nightlyRate = 250000;
 const cleaningFee = 0;
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 
 function nightsBetween(checkIn, checkOut) {
   if (!checkIn || !checkOut) return 0;
@@ -178,7 +179,7 @@ function App() {
 
     setLoading(true);
     try {
-      const createResponse = await fetch("/api/bookings", {
+      const createResponse = await fetch(`${API_BASE}/api/bookings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -193,7 +194,7 @@ function App() {
       if (!createResponse.ok)
         throw new Error(created.message || "Could not create booking.");
 
-      const paymentResponse = await fetch("/api/payments/initiate", {
+      const paymentResponse = await fetch(`${API_BASE}/api/payments/initiate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
